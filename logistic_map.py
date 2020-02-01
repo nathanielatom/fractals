@@ -13,10 +13,7 @@ def logistic_map(rate, z):
 
 
 @njit
-def limit_cycle(max_cycles, settling_iterations, z_init, rate_resolution):
-    rates = np.linspace(0, 4, rate_resolution)
-    zs = np.empty((max_cycles, rate_resolution))
-    z = np.ones(rate_resolution) * z_init
+def limit_cycle(max_cycles, settling_iterations, rates, zs, z):
     for iteration in range(settling_iterations + max_cycles):
         z = rates * z * (1 - z)
         if iteration >= settling_iterations:
@@ -30,7 +27,11 @@ def calculate_map():
     z_init = 0.5
     rate_resolution = 15000
 
-    rates, zs = limit_cycle(max_cycles, settling_iterations, z_init, rate_resolution)
+    rates = 5 - np.logspace(2, 0, rate_resolution, base=2)
+    zs = np.empty((max_cycles, rate_resolution))
+    z = np.ones(rate_resolution) * z_init
+
+    rates, zs = limit_cycle(max_cycles, settling_iterations, rates, zs, z)
     # vline_stack shows cumulative values, so undo that operation
     zs[1:] = np.diff(zs, axis=0)
 
@@ -47,6 +48,7 @@ def plot_map(data, keys):
     source = ColumnDataSource(data=data)
     plot = figure(plot_width=1400, plot_height=750)
     visual_options = dict(line_width=0.25, alpha=0.2)
+    # zero_line = plot.line([0, 1], [0, 0], **visual_options)
     lines = plot.vline_stack(keys[1:], x=keys[0], source=source, **visual_options)
     return plot
 
