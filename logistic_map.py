@@ -30,12 +30,15 @@ def limit_cycle(max_cycles, settling_iterations, rates, zs, z):
 
 
 def calculate_map():
-    max_cycles = 200
-    settling_iterations = 20000
-    z_init = 0.5
-    rate_resolution = 10000
+    max_cycles = 100
+    settling_iterations = 100000
+    z_init = 0.42
+    rate_resolution = 20000
+    rate_bound = 4
 
-    rates = 8 - np.logspace(3, 0, rate_resolution, base=2)
+    base = 2
+    rate_bound_exp = np.log(rate_bound) / np.log(base)
+    rates = base ** rate_bound_exp - np.logspace(rate_bound_exp, 0, rate_resolution, base=base)
     zs = np.empty((max_cycles, rate_resolution))
     z = np.ones(rate_resolution) * z_init
 
