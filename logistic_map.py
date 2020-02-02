@@ -1,5 +1,12 @@
 """
 Infinite logistics, the best kind!
+
+TODO: more functions! windows! humps!
+TODO: calculate ratio of bifurcations
+TODO: calculate FFT of each limit cycle, display against rate
+TODO: occurrence count / distribution of each LC cardinality (function of natural numbers); 6 occurs at least twice
+TODO: is secondary occurrence (say of LC3 in LC6) contain an exact reflection?
+
 """
 
 import numpy as np
@@ -15,19 +22,20 @@ def logistic_map(rate, z):
 @njit
 def limit_cycle(max_cycles, settling_iterations, rates, zs, z):
     for iteration in range(settling_iterations + max_cycles):
-        z = rates * z * (1 - z)
+        z = rates * np.sin(z * np.pi) # unifurcations? maybe hint of complex numbers? # what happens at rate=1?
+        # z = rates * z * (1 - z)
         if iteration >= settling_iterations:
             zs[iteration - settling_iterations] = z
     return rates, zs
 
 
 def calculate_map():
-    max_cycles = 250
+    max_cycles = 200
     settling_iterations = 20000
     z_init = 0.5
-    rate_resolution = 15000
+    rate_resolution = 10000
 
-    rates = 5 - np.logspace(2, 0, rate_resolution, base=2)
+    rates = 8 - np.logspace(3, 0, rate_resolution, base=2)
     zs = np.empty((max_cycles, rate_resolution))
     z = np.ones(rate_resolution) * z_init
 
