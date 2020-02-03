@@ -22,9 +22,9 @@ def logistic_map(rate, z):
 @njit
 def limit_cycle(max_cycles, settling_iterations, rates, zs, z):
     for iteration in range(settling_iterations + max_cycles):
-        z = rates * z * (1 - np.tanh(z))
+        # z = rates * z * (1 - np.tanh(z))
         # z = rates * np.sin(z * np.pi) # unifurcations? maybe hint of complex numbers? # what happens at rate=1?
-        # z = rates * z * (1 - z)
+        z = rates * z * (1 - z)
         if iteration >= settling_iterations:
             zs[iteration - settling_iterations] = z
     return rates, zs
