@@ -20,15 +20,15 @@ bokeh serve --show mandelbrot.py
 # TODO: Try mandelbrots original iterative formula: z_new = h * z_prev * (1 - z_prev)
 #       Why is it different? How do extra polynomial terms affect behaviour?
 # TODO: iterate the inverse transformation z_prev = ±(z_new - c) ** 0.5, to get the Julia set boundary
-# TODO: Investigate "Peitgen et al. (1992 p. 866) state in essence the following: if two buds 
-#       b1 and b3 have periodicities p and q, then the periodicity of the largest bud b2 that is smaller 
+# TODO: Investigate "Peitgen et al. (1992 p. 866) state in essence the following: if two buds
+#       b1 and b3 have periodicities p and q, then the periodicity of the largest bud b2 that is smaller
 #       than both b1 and b3 and which lies on the cardioid between them is equal to p + q."
 # TODO: Investigate fixed points in C and rotational (non-attracting) orbits
 # TODO: investigate alternative bokeh tickers to maybe allow for deeper max zoom
 # TODO: figure out custom float128-like type (not supported by cuda)
 # TODO: check-box for max iterations "Tied to Zoom", should it be linearly proportional?
 # TODO: once zoomed in past a certain level, hide Julia set, and make Mandelbrot full-screen
-# TODO: add indicator for active Julia crosshair 
+# TODO: add indicator for active Julia crosshair
 # TODO: profile/optimize cuda/bokeh - streams; hold/unhold?
 # TODO: add indicator for Fractal Dimension(s) - start with Hausdorff, Frostman capacitary dimension
 # TODO: add sliders/UI for other fractal parameters (sin func? - see old notebook)
@@ -36,7 +36,7 @@ bokeh serve --show mandelbrot.py
 # TODO: add toggle for int8 vs int16 (likely require 2 allocated arrays)
 # TODO: add logistic map, and estimator of Feigenbaum's constant, perhaps also along other directions than just the real line
 # TODO: slider for z_0
-# TODO: full 4D set described by bounded z_new = z_prev ** 2 + C; using 
+# TODO: full 4D set described by bounded z_new = z_prev ** 2 + C; using
 #       two plots for real, imag; or colour for mag, phase, showing full C plane or full z_0 plane
 # TODO: convergent fractals and/or root-finding fractals
 # TODO: animal-like fractal finder (image search, pre-trained conv net, or maybe just kNN)
@@ -46,6 +46,7 @@ bokeh serve --show mandelbrot.py
 
 
 import numpy as np
+from numba import njit
 from numba import cuda
 import math
 
@@ -56,25 +57,29 @@ from bokeh.layouts import column, row, widgetbox, layout, gridplot
 from bokeh.palettes import viridis
 
 
-@cuda.jit(device=True)
+gpu = cuda.is_available()
+jitter = cuda.jit(device=True) if gpu else njit
+
+
+@jitter
 def abs2(z):
     return z.real * z.real + z.imag * z.imag
 
 
-@cuda.jit(device=True)
+@jitter
 def pow(z, exponent):
     r = abs2(z) ** (0.5 * exponent)
     theta = math.atan2(z.imag, z.real) * exponent
     return r * math.cos(theta) + 1j * r * math.sin(theta)
 
 
-@cuda.jit(device=True)
+@jitter
 def powcomp(a, exponent):
     # TODO: test
     return a ** exponent.real * math.cos(exponent.imag * math.log(a)) + 1j * math.sin(exponent.imag * math.log(a))
 
 
-@cuda.jit(device=True)
+@jitter
 def mandel(x, y, max_iters, converge_thresh, z_exponent, c_exponent):
     """
     Given the real and imaginary parts of a complex number,
@@ -91,11 +96,11 @@ def mandel(x, y, max_iters, converge_thresh, z_exponent, c_exponent):
     return max_iters
 
 
-@cuda.jit(device=True)
+@jitter
 def julia(c, x, y, max_iters, converge_thresh, z_exponent, c_exponent):
     """
     Given the real and imaginary parts of a complex number,
-    and a given complex constant, determine if it is a candidate for 
+    and a given complex constant, determine if it is a candidate for
     membership in the Julia set given a fixed number of iterations.
 
     """
@@ -107,8 +112,7 @@ def julia(c, x, y, max_iters, converge_thresh, z_exponent, c_exponent):
             return i
     return max_iters
 
-
-@cuda.jit
+@njit
 def create_fractal(min_x, max_x, min_y, max_y, z_exponent, c_exponent, image, iters, converge_thresh):
     height = image.shape[0]
     width = image.shape[1]
@@ -116,19 +120,15 @@ def create_fractal(min_x, max_x, min_y, max_y, z_exponent, c_exponent, image, it
     pixel_size_x = (max_x - min_x) / width
     pixel_size_y = (max_y - min_y) / height
 
-    startX, startY = cuda.grid(2)
-    gridX = cuda.gridDim.x * cuda.blockDim.x;
-    gridY = cuda.gridDim.y * cuda.blockDim.y;
-
-    for x in range(startX, width, gridX):
+    for x in range(0, width):
         real = min_x + x * pixel_size_x
-        for y in range(startY, height, gridY):
-            imag = min_y + y * pixel_size_y 
+        for y in range(0, height):
+            imag = min_y + y * pixel_size_y
             image[y, x] = mandel(real, imag, iters, converge_thresh, z_exponent, c_exponent)
 
 
 @cuda.jit
-def create_fractal_julia(c, min_x, max_x, min_y, max_y, z_exponent, c_exponent, image, iters, converge_thresh):
+def create_fractal_gpu(min_x, max_x, min_y, max_y, z_exponent, c_exponent, image, iters, converge_thresh):
     height = image.shape[0]
     width = image.shape[1]
 
@@ -142,7 +142,41 @@ def create_fractal_julia(c, min_x, max_x, min_y, max_y, z_exponent, c_exponent, 
     for x in range(startX, width, gridX):
         real = min_x + x * pixel_size_x
         for y in range(startY, height, gridY):
-            imag = min_y + y * pixel_size_y 
+            imag = min_y + y * pixel_size_y
+            image[y, x] = mandel(real, imag, iters, converge_thresh, z_exponent, c_exponent)
+
+
+@njit
+def create_fractal_julia(c, min_x, max_x, min_y, max_y, z_exponent, c_exponent, image, iters, converge_thresh):
+    height = image.shape[0]
+    width = image.shape[1]
+
+    pixel_size_x = (max_x - min_x) / width
+    pixel_size_y = (max_y - min_y) / height
+
+    for x in range(0, width):
+        real = min_x + x * pixel_size_x
+        for y in range(0, height):
+            imag = min_y + y * pixel_size_y
+            image[y, x] = julia(c, real, imag, iters, converge_thresh, z_exponent, c_exponent)
+
+
+@cuda.jit
+def create_fractal_julia_gpu(c, min_x, max_x, min_y, max_y, z_exponent, c_exponent, image, iters, converge_thresh):
+    height = image.shape[0]
+    width = image.shape[1]
+
+    pixel_size_x = (max_x - min_x) / width
+    pixel_size_y = (max_y - min_y) / height
+
+    startX, startY = cuda.grid(2)
+    gridX = cuda.gridDim.x * cuda.blockDim.x;
+    gridY = cuda.gridDim.y * cuda.blockDim.y;
+
+    for x in range(startX, width, gridX):
+        real = min_x + x * pixel_size_x
+        for y in range(startY, height, gridY):
+            imag = min_y + y * pixel_size_y
             image[y, x] = julia(c, real, imag, iters, converge_thresh, z_exponent, c_exponent)
 
 
@@ -168,16 +202,20 @@ max_iterations = 50
 old_mandel_hash = hash((mandel_x_range, mandel_y_range, z_exponent, c_exponent, max_iterations))
 old_julia_hash = hash((julia_x_range, julia_y_range, z_exponent, c_exponent, max_iterations, c_julia))
 
-gpu_image = cuda.to_device(image)
-create_fractal[griddim, blockdim](*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, gpu_image, max_iterations, converge_threshold)
-gpu_image.to_host()
+if gpu:
+    gpu_image = cuda.to_device(image)
+    create_fractal_gpu[griddim, blockdim](*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, gpu_image, max_iterations, converge_threshold)
+    gpu_image.to_host()
 
-gpu_image_julia = cuda.to_device(image_julia)
-create_fractal_julia[griddim, blockdim](c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, gpu_image_julia, max_iterations, converge_threshold)
-gpu_image_julia.to_host()
+    gpu_image_julia = cuda.to_device(image_julia)
+    create_fractal_julia_gpu[griddim, blockdim](c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, gpu_image_julia, max_iterations, converge_threshold)
+    gpu_image_julia.to_host()
+else:
+    create_fractal(*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, image, max_iterations, converge_threshold)
+    create_fractal_julia(c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, image_julia, max_iterations, converge_threshold)
 
-source = ColumnDataSource(data=dict(image=[image], 
-    x=[mandel_x_range[0]], y=[mandel_y_range[0]], 
+source = ColumnDataSource(data=dict(image=[image],
+    x=[mandel_x_range[0]], y=[mandel_y_range[0]],
     dw=[mandel_x_range[1] - mandel_x_range[0]], dh=[mandel_y_range[1] - mandel_y_range[0]]))
 mandelplot = figure(title='Mandelbrot Set', width=w, height=h, x_range=mandel_x_range, y_range=mandel_y_range, active_scroll='wheel_zoom')
 mandelplot.image('image', x='x', y='y', dw='dw', dh='dh', palette=viridis(256), source=source)
@@ -197,8 +235,8 @@ mandelplot.add_tools(CrosshairTool())
 mandelplot.on_event(MouseMove, update_mouse)
 mandelplot.on_event(Tap, update_tap)
 
-source_julia = ColumnDataSource(data=dict(image=[image_julia], 
-    x=[julia_x_range[0]], y=[julia_y_range[0]], 
+source_julia = ColumnDataSource(data=dict(image=[image_julia],
+    x=[julia_x_range[0]], y=[julia_y_range[0]],
     dw=[julia_x_range[1] - julia_x_range[0]], dh=[julia_y_range[1] - julia_y_range[0]]))
 julia_plot = figure(title=f'Julia Set; c = {c_julia}', width=w, height=h, x_range=julia_x_range, y_range=julia_y_range, active_scroll='wheel_zoom')
 julia_plot.image('image', x='x', y='y', dw='dw', dh='dh', palette=viridis(256), source=source_julia)
@@ -214,7 +252,7 @@ def update():
 
     mandel_x_range = (mandelplot.x_range.start, mandelplot.x_range.end)
     mandel_y_range = (mandelplot.y_range.start, mandelplot.y_range.end)
-    
+
     julia_x_range = (julia_plot.x_range.start, julia_plot.x_range.end)
     julia_y_range = (julia_plot.y_range.start, julia_plot.y_range.end)
     c_julia = complex(hs.data['x'][0], hs.data['y'][0])
@@ -228,17 +266,23 @@ def update():
     old_julia_hash = julia_plot.tags[-1]
 
     if new_mandel_hash != old_mandel_hash:
-        create_fractal[griddim, blockdim](*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, gpu_image, max_iterations, converge_threshold)
-        gpu_image.to_host()
-        source.data.update(image=[image], x=[mandel_x_range[0]], y=[mandel_y_range[0]], 
+        if gpu:
+            create_fractal_gpu[griddim, blockdim](*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, gpu_image, max_iterations, converge_threshold)
+            gpu_image.to_host()
+        else:
+            create_fractal(*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, image, max_iterations, converge_threshold)
+        source.data.update(image=[image], x=[mandel_x_range[0]], y=[mandel_y_range[0]],
             dw=[mandel_x_range[1] - mandel_x_range[0]], dh=[mandel_y_range[1] - mandel_y_range[0]])
         mandelplot.tags[-1] = new_mandel_hash
         print(f'mandel event count: {mandelplot.tags[0]}')
     if new_julia_hash != old_julia_hash:
         julia_plot.title.text = f'Julia Set; c = {c_julia}'
-        create_fractal_julia[griddim, blockdim](c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, gpu_image_julia, max_iterations, converge_threshold)
-        gpu_image_julia.to_host()
-        source_julia.data.update(image=[image_julia], x=[julia_x_range[0]], y=[julia_y_range[0]], 
+        if gpu:
+            create_fractal_julia_gpu[griddim, blockdim](c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, gpu_image_julia, max_iterations, converge_threshold)
+            gpu_image_julia.to_host()
+        else:
+            create_fractal_julia(c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, image_julia, max_iterations, converge_threshold)
+        source_julia.data.update(image=[image_julia], x=[julia_x_range[0]], y=[julia_y_range[0]],
             dw=[julia_x_range[1] - julia_x_range[0]], dh=[julia_y_range[1] - julia_y_range[0]])
         julia_plot.tags[-1] = new_julia_hash
         print(f'julia event count: {julia_plot.tags[0]}')
