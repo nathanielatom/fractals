@@ -192,7 +192,10 @@ def create_fractal_julia_gpu(c, min_x, max_x, min_y, max_y, z_exponent, c_expone
 
 # if __name__ == '__main__':
 # Static parameters
-h, w = 1024, 1280
+if not args.skip_julia:
+    h, w = 1024, 1280
+else:
+    h, w = 800, 1280
 image = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
 image_julia = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
 blockdim = (32, 8)
