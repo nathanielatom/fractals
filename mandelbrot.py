@@ -158,8 +158,6 @@ def create_fractal_gpu(min_x, max_x, min_y, max_y, z_exponent, c_exponent, image
 
 @njit
 def create_fractal_julia(c, min_x, max_x, min_y, max_y, z_exponent, c_exponent, image, iters, converge_thresh):
-    if args.skip_julia:
-        return
     height = image.shape[0]
     width = image.shape[1]
 
@@ -175,8 +173,6 @@ def create_fractal_julia(c, min_x, max_x, min_y, max_y, z_exponent, c_exponent, 
 
 @cuda.jit
 def create_fractal_julia_gpu(c, min_x, max_x, min_y, max_y, z_exponent, c_exponent, image, iters, converge_thresh):
-    if args.skip_julia:
-        return
     height = image.shape[0]
     width = image.shape[1]
 
@@ -194,103 +190,107 @@ def create_fractal_julia_gpu(c, min_x, max_x, min_y, max_y, z_exponent, c_expone
             image[y, x] = julia(c, real, imag, iters, converge_thresh, z_exponent, c_exponent)
 
 
-if __name__ == '__main__':
-    # Static parameters
-    h, w = 1024, 1280
-    image = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
-    image_julia = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
-    blockdim = (32, 8)
-    griddim = (32, 16)
-    max_framerate = 10 # Hz
-    converge_threshold = 4
+# if __name__ == '__main__':
+# Static parameters
+h, w = 1024, 1280
+image = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
+image_julia = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
+blockdim = (32, 8)
+griddim = (32, 16)
+max_framerate = 10 # Hz
+converge_threshold = 4
 
-    # Initial parameters
-    mandel_x_range = (-2.125, 1)
-    mandel_y_range = (-1.25, 1.25)
-    julia_x_range = (-2, 2)
-    julia_y_range = (-1.6, 1.6)
-    z_exponent = 2
-    c_exponent = 1
-    c_julia = 0 + 0j
-    max_iterations = 50
+# Initial parameters
+mandel_x_range = (-2.125, 1)
+mandel_y_range = (-1.25, 1.25)
+julia_x_range = (-2, 2)
+julia_y_range = (-1.6, 1.6)
+z_exponent = 2
+c_exponent = 1
+c_julia = 0 + 0j
+max_iterations = 50
 
-    old_mandel_hash = hash((mandel_x_range, mandel_y_range, z_exponent, c_exponent, max_iterations))
-    old_julia_hash = hash((julia_x_range, julia_y_range, z_exponent, c_exponent, max_iterations, c_julia))
+old_mandel_hash = hash((mandel_x_range, mandel_y_range, z_exponent, c_exponent, max_iterations))
+old_julia_hash = hash((julia_x_range, julia_y_range, z_exponent, c_exponent, max_iterations, c_julia))
 
+if gpu:
+    gpu_image = cuda.to_device(image)
+    create_fractal_gpu[griddim, blockdim](*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, gpu_image, max_iterations, converge_threshold)
+    gpu_image.to_host()
+else:
+    create_fractal(*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, image, max_iterations, converge_threshold)
+
+if not args.skip_julia:
     if gpu:
-        gpu_image = cuda.to_device(image)
-        create_fractal_gpu[griddim, blockdim](*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, gpu_image, max_iterations, converge_threshold)
-        gpu_image.to_host()
-
         gpu_image_julia = cuda.to_device(image_julia)
         create_fractal_julia_gpu[griddim, blockdim](c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, gpu_image_julia, max_iterations, converge_threshold)
         gpu_image_julia.to_host()
     else:
-        create_fractal(*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, image, max_iterations, converge_threshold)
         create_fractal_julia(c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, image_julia, max_iterations, converge_threshold)
 
-    source = ColumnDataSource(data=dict(image=[image],
-        x=[mandel_x_range[0]], y=[mandel_y_range[0]],
-        dw=[mandel_x_range[1] - mandel_x_range[0]], dh=[mandel_y_range[1] - mandel_y_range[0]]))
-    mandelplot = figure(title='Mandelbrot Set', width=w, height=h, x_range=mandel_x_range, y_range=mandel_y_range, active_scroll='wheel_zoom')
-    mandelplot.image('image', x='x', y='y', dw='dw', dh='dh', palette=viridis(256), source=source)
+source = ColumnDataSource(data=dict(image=[image],
+    x=[mandel_x_range[0]], y=[mandel_y_range[0]],
+    dw=[mandel_x_range[1] - mandel_x_range[0]], dh=[mandel_y_range[1] - mandel_y_range[0]]))
+mandelplot = figure(title='Mandelbrot Set', width=w, height=h, x_range=mandel_x_range, y_range=mandel_y_range, active_scroll='wheel_zoom')
+mandelplot.image('image', x='x', y='y', dw='dw', dh='dh', palette=viridis(256), source=source)
 
-    # Cursor for Julia Set
-    hs = ColumnDataSource(data=dict(x=[c_julia.real], y=[c_julia.imag]))
-    def update_mouse(event):
-        if mandelplot.toolbar.active_inspect == 'auto':
-            hs.data.update(x=[event.x], y=[event.y])
-    def update_tap(event):
-        if mandelplot.toolbar.active_inspect == 'auto':
-            mandelplot.toolbar.active_inspect = None
+# Cursor for Julia Set
+hs = ColumnDataSource(data=dict(x=[c_julia.real], y=[c_julia.imag]))
+def update_mouse(event):
+    if mandelplot.toolbar.active_inspect == 'auto':
+        hs.data.update(x=[event.x], y=[event.y])
+def update_tap(event):
+    if mandelplot.toolbar.active_inspect == 'auto':
+        mandelplot.toolbar.active_inspect = None
+    else:
+        mandelplot.toolbar.active_inspect = 'auto'
+        hs.data.update(x=[event.x], y=[event.y])
+mandelplot.add_tools(CrosshairTool())
+mandelplot.on_event(MouseMove, update_mouse)
+mandelplot.on_event(Tap, update_tap)
+
+source_julia = ColumnDataSource(data=dict(image=[image_julia],
+    x=[julia_x_range[0]], y=[julia_y_range[0]],
+    dw=[julia_x_range[1] - julia_x_range[0]], dh=[julia_y_range[1] - julia_y_range[0]]))
+julia_plot = figure(title=f'Julia Set; c = {c_julia}', width=w, height=h, x_range=julia_x_range, y_range=julia_y_range, active_scroll='wheel_zoom')
+julia_plot.image('image', x='x', y='y', dw='dw', dh='dh', palette=viridis(256), source=source_julia)
+
+slider_exp_z = Slider(title="Z Exponent", start=0, end=10, value=z_exponent, step=0.01)
+slider_exp_c = Slider(title="C Exponent", start=-10, end=10, value=c_exponent, step=0.01)
+slider_max_i = Slider(title="Max Iterations", start=1, end=256 * 4, value=max_iterations, step=1)
+
+mandelplot.tags = [0, old_mandel_hash]
+julia_plot.tags = [0, old_julia_hash]
+def update():
+    z_exponent, c_exponent, max_iterations = slider_exp_z.value, slider_exp_c.value, slider_max_i.value
+
+    mandel_x_range = (mandelplot.x_range.start, mandelplot.x_range.end)
+    mandel_y_range = (mandelplot.y_range.start, mandelplot.y_range.end)
+
+    julia_x_range = (julia_plot.x_range.start, julia_plot.x_range.end)
+    julia_y_range = (julia_plot.y_range.start, julia_plot.y_range.end)
+    c_julia = complex(hs.data['x'][0], hs.data['y'][0])
+
+    new_mandel_hash = hash((mandel_x_range, mandel_y_range, z_exponent, c_exponent, max_iterations))
+    new_julia_hash = hash((julia_x_range, julia_y_range, z_exponent, c_exponent, max_iterations, c_julia))
+
+    mandelplot.tags[0] += 1
+    julia_plot.tags[0] += 1
+    old_mandel_hash = mandelplot.tags[-1]
+    old_julia_hash = julia_plot.tags[-1]
+
+    if new_mandel_hash != old_mandel_hash:
+        if gpu:
+            create_fractal_gpu[griddim, blockdim](*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, gpu_image, max_iterations, converge_threshold)
+            gpu_image.to_host()
         else:
-            mandelplot.toolbar.active_inspect = 'auto'
-            hs.data.update(x=[event.x], y=[event.y])
-    mandelplot.add_tools(CrosshairTool())
-    mandelplot.on_event(MouseMove, update_mouse)
-    mandelplot.on_event(Tap, update_tap)
-
-    source_julia = ColumnDataSource(data=dict(image=[image_julia],
-        x=[julia_x_range[0]], y=[julia_y_range[0]],
-        dw=[julia_x_range[1] - julia_x_range[0]], dh=[julia_y_range[1] - julia_y_range[0]]))
-    julia_plot = figure(title=f'Julia Set; c = {c_julia}', width=w, height=h, x_range=julia_x_range, y_range=julia_y_range, active_scroll='wheel_zoom')
-    julia_plot.image('image', x='x', y='y', dw='dw', dh='dh', palette=viridis(256), source=source_julia)
-
-    slider_exp_z = Slider(title="Z Exponent", start=0, end=10, value=z_exponent, step=0.01)
-    slider_exp_c = Slider(title="C Exponent", start=-10, end=10, value=c_exponent, step=0.01)
-    slider_max_i = Slider(title="Max Iterations", start=1, end=256 * 4, value=max_iterations, step=1)
-
-    mandelplot.tags = [0, old_mandel_hash]
-    julia_plot.tags = [0, old_julia_hash]
-    def update():
-        z_exponent, c_exponent, max_iterations = slider_exp_z.value, slider_exp_c.value, slider_max_i.value
-
-        mandel_x_range = (mandelplot.x_range.start, mandelplot.x_range.end)
-        mandel_y_range = (mandelplot.y_range.start, mandelplot.y_range.end)
-
-        julia_x_range = (julia_plot.x_range.start, julia_plot.x_range.end)
-        julia_y_range = (julia_plot.y_range.start, julia_plot.y_range.end)
-        c_julia = complex(hs.data['x'][0], hs.data['y'][0])
-
-        new_mandel_hash = hash((mandel_x_range, mandel_y_range, z_exponent, c_exponent, max_iterations))
-        new_julia_hash = hash((julia_x_range, julia_y_range, z_exponent, c_exponent, max_iterations, c_julia))
-
-        mandelplot.tags[0] += 1
-        julia_plot.tags[0] += 1
-        old_mandel_hash = mandelplot.tags[-1]
-        old_julia_hash = julia_plot.tags[-1]
-
-        if new_mandel_hash != old_mandel_hash:
-            if gpu:
-                create_fractal_gpu[griddim, blockdim](*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, gpu_image, max_iterations, converge_threshold)
-                gpu_image.to_host()
-            else:
-                create_fractal(*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, image, max_iterations, converge_threshold)
-            source.data.update(image=[image], x=[mandel_x_range[0]], y=[mandel_y_range[0]],
-                dw=[mandel_x_range[1] - mandel_x_range[0]], dh=[mandel_y_range[1] - mandel_y_range[0]])
-            mandelplot.tags[-1] = new_mandel_hash
-            print(f'mandel event count: {mandelplot.tags[0]}')
-        if new_julia_hash != old_julia_hash:
+            create_fractal(*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, image, max_iterations, converge_threshold)
+        source.data.update(image=[image], x=[mandel_x_range[0]], y=[mandel_y_range[0]],
+            dw=[mandel_x_range[1] - mandel_x_range[0]], dh=[mandel_y_range[1] - mandel_y_range[0]])
+        mandelplot.tags[-1] = new_mandel_hash
+        print(f'mandel event count: {mandelplot.tags[0]}')
+    if new_julia_hash != old_julia_hash:
+        if not args.skip_julia:
             julia_plot.title.text = f'Julia Set; c = {c_julia}'
             if gpu:
                 create_fractal_julia_gpu[griddim, blockdim](c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, gpu_image_julia, max_iterations, converge_threshold)
@@ -302,8 +302,8 @@ if __name__ == '__main__':
             julia_plot.tags[-1] = new_julia_hash
             print(f'julia event count: {julia_plot.tags[0]}')
 
-    grid = gridplot([[mandelplot] + ([julia_plot] if not args.skip_julia else []), [widgetbox(slider_exp_z, slider_exp_c, slider_max_i)]], sizing_mode='scale_width')
+grid = gridplot([[mandelplot] + ([julia_plot] if not args.skip_julia else []), [widgetbox(slider_exp_z, slider_exp_c, slider_max_i)]], sizing_mode='scale_width')
 
-    curdoc().add_periodic_callback(update, max_framerate ** -1 * 1000)
-    curdoc().add_root(grid)
+curdoc().add_periodic_callback(update, max_framerate ** -1 * 1000)
+curdoc().add_root(grid)
 
