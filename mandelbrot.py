@@ -31,7 +31,7 @@ bokeh serve --show mandelbrot.py
 # TODO: add indicator for active Julia crosshair
 # TODO: profile/optimize cuda/bokeh - streams; hold/unhold?
 # TODO: add indicator for Fractal Dimension(s) - start with Hausdorff, Frostman capacitary dimension
-# TODO: add sliders/UI for other fractal parameters (sin func? - see old notebook)
+# TODO: add sliders = /UI for other fractal parameters (sin func? - see old notebook)
 # TODO: add Mandelbar, Cubic, Lambda, Phoenix, Tetrate, Newton, Nova, Barnsley, Magnet
 # TODO: add toggle for int8 vs int16 (likely require 2 allocated arrays)
 # TODO: add logistic map, and estimator of Feigenbaum's constant, perhaps also along other directions than just the real line
@@ -195,7 +195,7 @@ def create_fractal_julia_gpu(c, min_x, max_x, min_y, max_y, z_exponent, c_expone
 if not args.skip_julia:
     h, w = 1024, 1280
 else:
-    h, w = 800, 1280
+    h, w = 800, 1000
 image = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
 image_julia = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
 blockdim = (32, 8)
@@ -305,7 +305,8 @@ def update():
             julia_plot.tags[-1] = new_julia_hash
             print(f'julia event count: {julia_plot.tags[0]}')
 
-grid = gridplot([[mandelplot] + ([julia_plot] if not args.skip_julia else []), [widgetbox(slider_exp_z, slider_exp_c, slider_max_i)]], sizing_mode='scale_width')
+sliders = [widgetbox(slider_exp_z, slider_exp_c, slider_max_i)]
+grid = gridplot([[mandelplot] + ([julia_plot] if not args.skip_julia else sliders), sliders if not args.skip_julia else []], sizing_mode='scale_width')
 
 curdoc().add_periodic_callback(update, max_framerate ** -1 * 1000)
 curdoc().add_root(grid)
