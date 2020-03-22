@@ -82,6 +82,13 @@ def pow(z, exponent):
     theta = math.atan2(z.imag, z.real) * exponent
     return r * math.cos(theta) + 1j * r * math.sin(theta)
 
+@jitter
+def sin(z):
+    return math.sin(z.real) * math.cosh(z.imag) + 1j * math.cos(z.real) * math.sinh(z.imag)
+
+@jitter
+def cos(z):
+    return math.cos(z.real) * math.cosh(z.imag) - 1j * math.sin(z.real) * math.sinh(z.imag)
 
 @jitter
 def powcomp(a, exponent):
@@ -100,7 +107,9 @@ def mandel(x, y, max_iters, converge_thresh, z_exponent, c_exponent):
     c = complex(x, y)
     z = 0.0j
     for i in range(max_iters):
-        z = pow(z, z_exponent) + pow(c, c_exponent) # + math.pow(math.e, 1j * z) + math.pow(math.e, -1j * z)
+        # z = ((7 * z + 2) - cos(math.pi * z) * (5 * z + 2)) / 4 # collatz 1
+        z = (z / 2) * cos(math.pi / 2 * z) ** 2 + ((3 * z + 1) / 2) * sin(math.pi / 2 * z) ** 2
+        # z = pow(z, z_exponent) + pow(c, c_exponent) # + math.pow(math.e, 1j * z) + math.pow(math.e, -1j * z)
         if abs2(z) >= converge_thresh:
             return i
     return max_iters
