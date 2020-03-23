@@ -105,8 +105,9 @@ def mandel(x, y, max_iters, converge_thresh, z_exponent, c_exponent):
     set given a fixed number of iterations.
 
     """
-    c = complex(x, y)
-    z = 0.0j
+    # c = complex(x, y)
+    # z = 0.0j
+    z = complex(x, y)
     for i in range(max_iters):
         # try with e instead of sin or cos: math.exp(1j * math.pi * z)
         # z = ((7 * z + 2) - powcomp(ei, math.pi * z) * (5 * z + 2)) / 4 # collatz 1
@@ -206,6 +207,7 @@ def create_fractal_julia_gpu(c, min_x, max_x, min_y, max_y, z_exponent, c_expone
 
 # if __name__ == '__main__':
 # Static parameters
+title = 'A Collatz Set'
 if not args.skip_julia:
     h, w = 1024, 1280
 else:
@@ -215,7 +217,7 @@ image_julia = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
 blockdim = (32, 8)
 griddim = (32, 16)
 max_framerate = 10 # Hz
-converge_threshold = 50 # 4
+converge_threshold = 50 # 4 # 2
 
 # Initial parameters
 mandel_x_range = (-2.125, 1)
@@ -248,7 +250,7 @@ if not args.skip_julia:
 source = ColumnDataSource(data=dict(image=[image],
     x=[mandel_x_range[0]], y=[mandel_y_range[0]],
     dw=[mandel_x_range[1] - mandel_x_range[0]], dh=[mandel_y_range[1] - mandel_y_range[0]]))
-mandelplot = figure(title='Mandelbrot Set', width=w, height=h, x_range=mandel_x_range, y_range=mandel_y_range, active_scroll='wheel_zoom')
+mandelplot = figure(title=title, width=w, height=h, x_range=mandel_x_range, y_range=mandel_y_range, active_scroll='wheel_zoom')
 mandelplot.image('image', x='x', y='y', dw='dw', dh='dh', palette=viridis(256), source=source)
 
 # Cursor for Julia Set
@@ -275,11 +277,12 @@ julia_plot.image('image', x='x', y='y', dw='dw', dh='dh', palette=viridis(256), 
 slider_exp_z = Slider(title="Z Exponent", start=0, end=10, value=z_exponent, step=0.01)
 slider_exp_c = Slider(title="C Exponent", start=-10, end=10, value=c_exponent, step=0.01)
 slider_max_i = Slider(title="Max Iterations", start=1, end=256 * 4, value=max_iterations, step=1)
+slider_conv_thresh = Slider(title="Convergence Threshold", start=0, end=1000, value=converge_threshold, step=0.5)
 
 mandelplot.tags = [0, old_mandel_hash]
 julia_plot.tags = [0, old_julia_hash]
 def update():
-    z_exponent, c_exponent, max_iterations = slider_exp_z.value, slider_exp_c.value, slider_max_i.value
+    z_exponent, c_exponent, max_iterations, converge_threshold = slider_exp_z.value, slider_exp_c.value, slider_max_i.value, slider_conv_thresh.value
 
     mandel_x_range = (mandelplot.x_range.start, mandelplot.x_range.end)
     mandel_y_range = (mandelplot.y_range.start, mandelplot.y_range.end)
@@ -319,7 +322,7 @@ def update():
             julia_plot.tags[-1] = new_julia_hash
             print(f'julia event count: {julia_plot.tags[0]}')
 
-sliders = [widgetbox(slider_exp_z, slider_exp_c, slider_max_i)]
+sliders = [widgetbox(slider_exp_z, slider_exp_c, slider_max_i, slider_conv_thresh)]
 grid = gridplot([[mandelplot] + ([julia_plot] if not args.skip_julia else sliders), sliders if not args.skip_julia else []], sizing_mode='scale_width')
 
 curdoc().add_periodic_callback(update, max_framerate ** -1 * 1000)
