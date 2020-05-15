@@ -54,7 +54,7 @@ import math
 from bokeh.plotting import ColumnDataSource, figure, curdoc
 from bokeh.models import Slider, CrosshairTool, CustomJS
 from bokeh.events import MouseMove, Tap
-from bokeh.layouts import column, row, widgetbox, layout, gridplot
+from bokeh.layouts import column, row, layout, gridplot
 from bokeh.palettes import viridis
 
 
@@ -115,6 +115,8 @@ def mandel(x, y, max_iters, converge_thresh, z_exponent, c_exponent):
         # z = ((7 * z + 2) - cos(math.pi * z) * (5 * z + 2)) / 4 # collatz 1
         # z = (z / 2) * cos(math.pi / 2 * z) ** 2 + ((3 * z + 1) / 2) * sin(math.pi / 2 * z) ** 2 # complex collatz
         # z = z * sin(1 / z) + pow(c, c_exponent)
+
+        # general mandelbrot formula
         # z = pow(z, z_exponent) + pow(c, c_exponent) # + math.pow(math.e, 1j * z) + math.pow(math.e, -1j * z)
         if abs2(z) >= converge_thresh:
             return i
@@ -322,7 +324,7 @@ def update():
             julia_plot.tags[-1] = new_julia_hash
             print(f'julia event count: {julia_plot.tags[0]}')
 
-sliders = [widgetbox(slider_exp_z, slider_exp_c, slider_max_i, slider_conv_thresh)]
+sliders = [column(slider_exp_z, slider_exp_c, slider_max_i, slider_conv_thresh)]
 grid = gridplot([[mandelplot] + ([julia_plot] if not args.skip_julia else sliders), sliders if not args.skip_julia else []], sizing_mode='scale_width')
 
 curdoc().add_periodic_callback(update, max_framerate ** -1 * 1000)
