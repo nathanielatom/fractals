@@ -12,10 +12,16 @@ Run it with:
 bokeh serve --show mandelbrot.py
 ```
 
+or
+
+```
+bokeh serve --show mandelbrot.py --args --skip_julia
+```
+
 # TODO: cleanup and document
 # TODO: github repo
 # TODO: add slider throttle to boost performance https://github.com/bokeh/bokeh/issues/4540
-# TODO: try converge_threshold = 2; lookup and read proof
+# TODO: review mandel converge_threshold = 2; https://math.stackexchange.com/questions/890190/mandelbrot-sets-and-radius-of-convergence
 # TODO: visualize orbits (individual scatter points? multi-coloured?) on Julia set, or both??
 # TODO: Try mandelbrots original iterative formula: z_new = h * z_prev * (1 - z_prev)
 #       Why is it different? How do extra polynomial terms affect behaviour?
@@ -105,19 +111,11 @@ def mandel(x, y, max_iters, converge_thresh, z_exponent, c_exponent):
     set given a fixed number of iterations.
 
     """
-    # c = complex(x, y)
-    # z = 0.0j
-    z = complex(x, y)
+    c = complex(x, y)
+    z = 0.0j
     for i in range(max_iters):
-        # try with e instead of sin or cos: math.exp(1j * math.pi * z)
-        # z = ((7 * z + 2) - powcomp(ei, math.pi * z) * (5 * z + 2)) / 4 # collatz 1
-        z = ((7 * z + 2) - np.exp(1j * math.pi * z) * (5 * z + 2)) / 4 # collatz 1
-        # z = ((7 * z + 2) - cos(math.pi * z) * (5 * z + 2)) / 4 # collatz 1
-        # z = (z / 2) * cos(math.pi / 2 * z) ** 2 + ((3 * z + 1) / 2) * sin(math.pi / 2 * z) ** 2 # complex collatz
-        # z = z * sin(1 / z) + pow(c, c_exponent)
-
         # general mandelbrot formula
-        # z = pow(z, z_exponent) + pow(c, c_exponent) # + math.pow(math.e, 1j * z) + math.pow(math.e, -1j * z)
+        z = pow(z, z_exponent) + pow(c, c_exponent) # + math.pow(math.e, 1j * z) + math.pow(math.e, -1j * z)
         if abs2(z) >= converge_thresh:
             return i
     return max_iters
@@ -209,7 +207,7 @@ def create_fractal_julia_gpu(c, min_x, max_x, min_y, max_y, z_exponent, c_expone
 
 # if __name__ == '__main__':
 # Static parameters
-title = 'A Collatz Set'
+title = 'Mandelbrot Set'
 if not args.skip_julia:
     h, w = 1024, 1280
 else:
@@ -219,7 +217,7 @@ image_julia = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
 blockdim = (32, 8)
 griddim = (32, 16)
 max_framerate = 10 # Hz
-converge_threshold = 50 # 4 # 2
+converge_threshold = 2
 
 # Initial parameters
 mandel_x_range = (-2.125, 1)
