@@ -19,7 +19,6 @@ bokeh serve --show mandelbrot.py --args --skip_julia
 ```
 
 # TODO: cleanup and document
-# TODO: github repo
 # TODO: add slider throttle to boost performance https://github.com/bokeh/bokeh/issues/4540
 # TODO: review mandel converge_threshold = 2; https://math.stackexchange.com/questions/890190/mandelbrot-sets-and-radius-of-convergence
 # TODO: visualize orbits (individual scatter points? multi-coloured?) on Julia set, or both??
@@ -32,6 +31,8 @@ bokeh serve --show mandelbrot.py --args --skip_julia
 # TODO: Investigate fixed points in C and rotational (non-attracting) orbits
 # TODO: investigate alternative bokeh tickers to maybe allow for deeper max zoom
 # TODO: figure out custom float128-like type (not supported by cuda)
+# TODO: try out with Julia ArbFloats for better precision (using julia python lib for numba and bokeh integration)
+#       https://github.com/JuliaArbTypes/ArbFloats.jl
 # TODO: check-box for max iterations "Tied to Zoom", should it be linearly proportional?
 # TODO: once zoomed in past a certain level, hide Julia set, and make Mandelbrot full-screen
 # TODO: add indicator for active Julia crosshair
