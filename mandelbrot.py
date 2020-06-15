@@ -12,10 +12,15 @@ Run it with:
 bokeh serve --show mandelbrot.py
 ```
 
+or
+
+```
+bokeh serve --show mandelbrot.py --args --skip_julia
+```
+
 # TODO: cleanup and document
-# TODO: github repo
 # TODO: add slider throttle to boost performance https://github.com/bokeh/bokeh/issues/4540
-# TODO: try converge_threshold = 2; lookup and read proof
+# TODO: review mandel converge_threshold = 2; https://math.stackexchange.com/questions/890190/mandelbrot-sets-and-radius-of-convergence
 # TODO: visualize orbits (individual scatter points? multi-coloured?) on Julia set, or both??
 # TODO: Try mandelbrots original iterative formula: z_new = h * z_prev * (1 - z_prev)
 #       Why is it different? How do extra polynomial terms affect behaviour?
@@ -26,6 +31,8 @@ bokeh serve --show mandelbrot.py
 # TODO: Investigate fixed points in C and rotational (non-attracting) orbits
 # TODO: investigate alternative bokeh tickers to maybe allow for deeper max zoom
 # TODO: figure out custom float128-like type (not supported by cuda)
+# TODO: try out with Julia ArbFloats for better precision (using julia python lib for numba and bokeh integration)
+#       https://github.com/JuliaArbTypes/ArbFloats.jl
 # TODO: check-box for max iterations "Tied to Zoom", should it be linearly proportional?
 # TODO: once zoomed in past a certain level, hide Julia set, and make Mandelbrot full-screen
 # TODO: add indicator for active Julia crosshair
@@ -84,9 +91,15 @@ def pow(z, exponent):
 
 @jitter
 def tetration(z, n):
+    # change to for loop over complex_exp for int n
+    # extend for complex n
     if n == 0:
         return 1
     return pow(z, tetration(z, n - 1))
+
+@jitter
+def complex_exp(z, r):
+    return math.e ** (r * z) # ensure complex mult
 
 @jitter
 def sin(z):
@@ -211,7 +224,7 @@ def create_fractal_julia_gpu(c, min_x, max_x, min_y, max_y, z_exponent, c_expone
 
 # if __name__ == '__main__':
 # Static parameters
-title = 'A Collatz Set'
+title = 'Tetration Convergence Set'
 if not args.skip_julia:
     h, w = 1024, 1280
 else:
@@ -221,7 +234,7 @@ image_julia = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
 blockdim = (32, 8)
 griddim = (32, 16)
 max_framerate = 10 # Hz
-converge_threshold = 50 # 4 # 2
+converge_threshold = 2
 
 # Initial parameters
 mandel_x_range = (-2.125, 1)
