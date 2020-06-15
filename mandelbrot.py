@@ -234,7 +234,7 @@ image_julia = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
 blockdim = (32, 8)
 griddim = (32, 16)
 max_framerate = 10 # Hz
-converge_threshold = 2
+converge_threshold = 50 # 4 # 2
 
 # Initial parameters
 mandel_x_range = (-2.125, 1)
