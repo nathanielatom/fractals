@@ -22,6 +22,7 @@ bokeh serve --show mandelbrot.py --args --skip_julia
 # TODO: add slider throttle to boost performance https://github.com/bokeh/bokeh/issues/4540
 # TODO: review mandel converge_threshold = 2; https://math.stackexchange.com/questions/890190/mandelbrot-sets-and-radius-of-convergence
 # TODO: visualize orbits (individual scatter points? multi-coloured?) on Julia set, or both??
+# TODO: add black hole fractals: https://arxiv.org/pdf/gr-qc/9502014.pdf
 # TODO: Try mandelbrots original iterative formula: z_new = h * z_prev * (1 - z_prev)
 #       Why is it different? How do extra polynomial terms affect behaviour?
 # TODO: iterate the inverse transformation z_prev = ±(z_new - c) ** 0.5, to get the Julia set boundary
