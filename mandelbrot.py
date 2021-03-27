@@ -124,7 +124,7 @@ def mandel(x, y, max_iters, converge_thresh, z_exponent, c_exponent):
     for i in range(max_iters):
         # general mandelbrot formula
         z = pow(z, z_exponent) + pow(c, c_exponent) # + math.pow(math.e, 1j * z) + math.pow(math.e, -1j * z)
-        if abs2(z) >= converge_thresh:
+        if abs2(z) > converge_thresh:
             return i
     return max_iters
 
@@ -141,7 +141,7 @@ def julia(c, x, y, max_iters, converge_thresh, z_exponent, c_exponent):
     for i in range(max_iters):
         # Z <- Z ^ 2 + C
         z = pow(z, z_exponent) + pow(c, c_exponent) # + math.pow(math.e, 1j * z) + math.pow(math.e, -1j * z)
-        if abs2(z) >= converge_thresh:
+        if abs2(z) > converge_thresh:
             return i
     return max_iters
 
@@ -225,7 +225,7 @@ image_julia = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
 blockdim = (32, 8)
 griddim = (32, 16)
 max_framerate = 10 # Hz
-converge_threshold = 2
+converge_threshold = 4 # mandelbrot guaranteed to diverge when |z| > 2 or |z|^2 > 4 # ref: http://mrob.com/pub/muency/escaperadius.html
 
 # Initial parameters
 mandel_x_range = (-2.125, 1)
