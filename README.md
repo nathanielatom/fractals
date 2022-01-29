@@ -14,3 +14,12 @@ A [bunch](https://photos.app.goo.gl/mqa36t17Scu4g3428) of fun fractalscapes from
 ### Logistic Map
 
 Just a rough plot for now, to explore the limit cycle behaviour when functions other than quadratics are used.
+
+## Usage
+
+To run the server for remote connections:
+
+```
+bokeh serve mandelbrot.py --address "0.0.0.0" --allow-websocket-origin=<ip>:5006
+```
+
