@@ -22,6 +22,7 @@ bokeh serve --show mandelbrot.py --args --skip_julia
 # TODO: add slider throttle to boost performance https://github.com/bokeh/bokeh/issues/4540
 # TODO: review mandel converge_threshold = 2; https://math.stackexchange.com/questions/890190/mandelbrot-sets-and-radius-of-convergence
 # TODO: visualize orbits (individual scatter points? multi-coloured?) on Julia set, or both??
+# TODO: add black hole fractals: https://arxiv.org/pdf/gr-qc/9502014.pdf
 # TODO: Try mandelbrots original iterative formula: z_new = h * z_prev * (1 - z_prev)
 #       Why is it different? How do extra polynomial terms affect behaviour?
 # TODO: iterate the inverse transformation z_prev = ±(z_new - c) ** 0.5, to get the Julia set boundary
@@ -52,8 +53,10 @@ bokeh serve --show mandelbrot.py --args --skip_julia
 """
 
 import argparse
+import warnings
 
 import numpy as np
+import numba
 from numba import njit
 from numba import cuda
 import math
@@ -75,6 +78,10 @@ args = parser.parse_args()
 
 
 gpu = cuda.is_available()
+if gpu and not cuda.is_supported_version():
+	cuda_version = '.'.join(str(ver) for ver in cuda.runtime.get_version())
+	message = f'Numba v{numba.__version__} does not officially support CUDA v{cuda_version}'
+	warnings.warn(message)
 jitter = cuda.jit(device=True) if gpu else njit
 
 
@@ -243,7 +250,7 @@ old_julia_hash = hash((julia_x_range, julia_y_range, z_exponent, c_exponent, max
 if gpu:
     gpu_image = cuda.to_device(image)
     create_fractal_gpu[griddim, blockdim](*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, gpu_image, max_iterations, converge_threshold)
-    gpu_image.to_host()
+    gpu_image.copy_to_host(image)
 else:
     create_fractal(*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, image, max_iterations, converge_threshold)
 
@@ -251,7 +258,7 @@ if not args.skip_julia:
     if gpu:
         gpu_image_julia = cuda.to_device(image_julia)
         create_fractal_julia_gpu[griddim, blockdim](c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, gpu_image_julia, max_iterations, converge_threshold)
-        gpu_image_julia.to_host()
+        gpu_image_julia.copy_to_host(image_julia)
     else:
         create_fractal_julia(c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, image_julia, max_iterations, converge_threshold)
 
@@ -310,7 +317,7 @@ def update():
     if new_mandel_hash != old_mandel_hash:
         if gpu:
             create_fractal_gpu[griddim, blockdim](*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, gpu_image, max_iterations, converge_threshold)
-            gpu_image.to_host()
+            gpu_image.copy_to_host(image)
         else:
             create_fractal(*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, image, max_iterations, converge_threshold)
         source.data.update(image=[image], x=[mandel_x_range[0]], y=[mandel_y_range[0]],
@@ -322,7 +329,7 @@ def update():
             julia_plot.title.text = f'Julia Set; c = {c_julia}'
             if gpu:
                 create_fractal_julia_gpu[griddim, blockdim](c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, gpu_image_julia, max_iterations, converge_threshold)
-                gpu_image_julia.to_host()
+                gpu_image_julia.copy_to_host(image_julia)
             else:
                 create_fractal_julia(c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, image_julia, max_iterations, converge_threshold)
             source_julia.data.update(image=[image_julia], x=[julia_x_range[0]], y=[julia_y_range[0]],
