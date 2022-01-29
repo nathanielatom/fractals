@@ -84,11 +84,9 @@ if gpu and not cuda.is_supported_version():
 	warnings.warn(message)
 jitter = cuda.jit(device=True) if gpu else njit
 
-
 @jitter
 def abs2(z):
     return z.real * z.real + z.imag * z.imag
-
 
 @jitter
 def pow(z, exponent):
@@ -106,8 +104,7 @@ def cos(z):
 
 @jitter
 def powcomp(a, exponent):
-    # TODO: test
-    return a ** exponent.real * math.cos(exponent.imag * math.log(a)) + 1j * math.sin(exponent.imag * math.log(a))
+    return a ** exponent.real * (math.cos(exponent.imag * math.log(a)) + 1j * math.sin(exponent.imag * math.log(a)))
 
 ei = np.e ** 1j
 
@@ -121,11 +118,15 @@ def mandel(x, y, max_iters, converge_thresh, z_exponent, c_exponent):
     """
     # c = complex(x, y)
     # z = 0.0j
+    factor = z_exponent
+    term = c_exponent
     z = complex(x, y)
     for i in range(max_iters):
         # try with e instead of sin or cos: math.exp(1j * math.pi * z)
         # z = ((7 * z + 2) - powcomp(ei, math.pi * z) * (5 * z + 2)) / 4 # collatz 1
-        z = ((7 * z + 2) - np.exp(1j * math.pi * z) * (5 * z + 2)) / 4 # collatz 1
+        # z = ((7 * z + 2) - powcomp(np.e, 1j * math.pi * z) * (5 * z + 2)) / 4 # collatz 1
+        # adjustable collatz
+        z = ((term * z + 2) - powcomp(np.e, 1j * math.pi * z) * (factor * z + 2)) / 4 # collatz 1
         # z = ((7 * z + 2) - cos(math.pi * z) * (5 * z + 2)) / 4 # collatz 1
         # z = (z / 2) * cos(math.pi / 2 * z) ** 2 + ((3 * z + 1) / 2) * sin(math.pi / 2 * z) ** 2 # complex collatz
         # z = z * sin(1 / z) + pow(c, c_exponent)
@@ -223,6 +224,7 @@ def create_fractal_julia_gpu(c, min_x, max_x, min_y, max_y, z_exponent, c_expone
 # if __name__ == '__main__':
 # Static parameters
 title = 'A Collatz Set'
+args.skip_julia = True
 if not args.skip_julia:
     h, w = 1024, 1280
 else:
@@ -239,8 +241,8 @@ mandel_x_range = (-2.125, 1)
 mandel_y_range = (-1.25, 1.25)
 julia_x_range = (-2, 2)
 julia_y_range = (-1.6, 1.6)
-z_exponent = 2
-c_exponent = 1
+z_exponent = 5
+c_exponent = 7
 c_julia = 0 + 0j
 max_iterations = 50
 
