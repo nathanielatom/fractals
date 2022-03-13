@@ -126,8 +126,8 @@ def mandel(x, y, slider_a, slider_b, slider_c, slider_d):
         c = complex(x, y)
         z = 0.0j
         # general mandelbrot formula
-        def fractal(z):
-            return pow(z, z_exponent) + pow(c, c_exponent) # + math.pow(math.e, 1j * z) + math.pow(math.e, -1j * z)
+        # def fractal(z):
+        #     return pow(z, z_exponent) + pow(c, c_exponent) # + math.pow(math.e, 1j * z) + math.pow(math.e, -1j * z)
     elif fractal == 'collatz':
         exp_coeff = slider_a
         lin_coeff = slider_b
