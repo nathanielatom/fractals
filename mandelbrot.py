@@ -109,29 +109,44 @@ def powcomp(a, exponent):
 ei = np.e ** 1j
 
 @jitter
-def mandel(x, y, max_iters, converge_thresh, z_exponent, c_exponent):
+def mandel(x, y, slider_a, slider_b, slider_c, slider_d, fractal='collatz'):
     """
     Given the real and imaginary parts of a complex number,
     determine if it is a candidate for membership in the Mandelbrot
     set given a fixed number of iterations.
 
     """
-    # c = complex(x, y)
-    # z = 0.0j
-    factor = z_exponent
-    term = c_exponent
-    z = complex(x, y)
-    for i in range(max_iters):
+    # z = z * sin(1 / z) + pow(c, c_exponent) # forgot what this one was, looks fun
+    if fractal == 'mandel':
+        max_iters = slider_c
+        converge_thresh = slider_d
+        z_exponent = slider_a
+        c_exponent = slider_b
+        c = complex(x, y)
+        z = 0.0j
+        # general mandelbrot formula
+        def fractal(z):
+            return pow(z, z_exponent) + pow(c, c_exponent) # + math.pow(math.e, 1j * z) + math.pow(math.e, -1j * z)
+    elif fractal == 'collatz':
+        exp_coeff = slider_a
+        lin_coeff = slider_b
+        max_iters = slider_c
+        converge_thresh = 100
+        bias_term = slider_d
+
         # try with e instead of sin or cos: math.exp(1j * math.pi * z)
         # z = ((7 * z + 2) - powcomp(ei, math.pi * z) * (5 * z + 2)) / 4 # collatz 1
         # z = ((7 * z + 2) - powcomp(np.e, 1j * math.pi * z) * (5 * z + 2)) / 4 # collatz 1
-        # adjustable collatz
-        z = ((term * z + 2) - powcomp(np.e, 1j * math.pi * z) * (factor * z + 2)) / 4 # collatz 1
         # z = ((7 * z + 2) - cos(math.pi * z) * (5 * z + 2)) / 4 # collatz 1
         # z = (z / 2) * cos(math.pi / 2 * z) ** 2 + ((3 * z + 1) / 2) * sin(math.pi / 2 * z) ** 2 # complex collatz
-        # z = z * sin(1 / z) + pow(c, c_exponent)
-        # general mandelbrot formula
-        # z = pow(z, z_exponent) + pow(c, c_exponent) # + math.pow(math.e, 1j * z) + math.pow(math.e, -1j * z)
+
+        z = complex(x, y)
+        # adjustable collatz
+        def fractal(z):
+            return ((lin_coeff * z + bias_term) - powcomp(np.e, 1j * math.pi * z) * (exp_coeff * z + bias_term)) / 4
+
+    for i in range(max_iters):
+        z = fractal(z)
         if abs2(z) >= converge_thresh:
             return i
     return max_iters
@@ -234,7 +249,8 @@ image_julia = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
 blockdim = (32, 8)
 griddim = (32, 16)
 max_framerate = 10 # Hz
-converge_threshold = 100
+
+bias_term = 2
 
 # Initial parameters
 mandel_x_range = (-2.125, 1)
@@ -251,18 +267,18 @@ old_julia_hash = hash((julia_x_range, julia_y_range, z_exponent, c_exponent, max
 
 if gpu:
     gpu_image = cuda.to_device(image)
-    create_fractal_gpu[griddim, blockdim](*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, gpu_image, max_iterations, converge_threshold)
+    create_fractal_gpu[griddim, blockdim](*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, gpu_image, max_iterations, bias_term)
     gpu_image.copy_to_host(image)
 else:
-    create_fractal(*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, image, max_iterations, converge_threshold)
+    create_fractal(*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, image, max_iterations, bias_term)
 
 if not args.skip_julia:
     if gpu:
         gpu_image_julia = cuda.to_device(image_julia)
-        create_fractal_julia_gpu[griddim, blockdim](c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, gpu_image_julia, max_iterations, converge_threshold)
+        create_fractal_julia_gpu[griddim, blockdim](c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, gpu_image_julia, max_iterations, bias_term)
         gpu_image_julia.copy_to_host(image_julia)
     else:
-        create_fractal_julia(c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, image_julia, max_iterations, converge_threshold)
+        create_fractal_julia(c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, image_julia, max_iterations, bias_term)
 
 source = ColumnDataSource(data=dict(image=[image],
     x=[mandel_x_range[0]], y=[mandel_y_range[0]],
@@ -291,15 +307,16 @@ source_julia = ColumnDataSource(data=dict(image=[image_julia],
 julia_plot = figure(title=f'Julia Set; c = {c_julia}', width=w, height=h, x_range=julia_x_range, y_range=julia_y_range, active_scroll='wheel_zoom')
 julia_plot.image('image', x='x', y='y', dw='dw', dh='dh', palette=viridis(256), source=source_julia)
 
-slider_exp_z = Slider(title="Z Exponent", start=0, end=10, value=z_exponent, step=0.01)
-slider_exp_c = Slider(title="C Exponent", start=-10, end=10, value=c_exponent, step=0.01)
-slider_max_i = Slider(title="Max Iterations", start=1, end=256 * 4, value=max_iterations, step=1)
-slider_conv_thresh = Slider(title="Convergence Threshold", start=0, end=1000, value=converge_threshold, step=0.5)
+# TODO: rename sliders and cleanup parameter variables
+slider_exp_z = Slider(title="Exponential Coefficient", start=-100, end=100, value=z_exponent, step=0.1)
+slider_exp_c = Slider(title="Linear Coefficient", start=-50, end=50, value=c_exponent, step=0.005)
+slider_max_i = Slider(title="Max Iterations", start=1, end=2 ** 10, value=max_iterations, step=1)
+slider_conv_thresh = Slider(title="Bias Term", start=-100, end=100, value=bias_term, step=0.1)
 
 mandelplot.tags = [0, old_mandel_hash]
 julia_plot.tags = [0, old_julia_hash]
 def update():
-    z_exponent, c_exponent, max_iterations, converge_threshold = slider_exp_z.value, slider_exp_c.value, slider_max_i.value, slider_conv_thresh.value
+    z_exponent, c_exponent, max_iterations, bias_term = slider_exp_z.value, slider_exp_c.value, slider_max_i.value, slider_conv_thresh.value
 
     mandel_x_range = (mandelplot.x_range.start, mandelplot.x_range.end)
     mandel_y_range = (mandelplot.y_range.start, mandelplot.y_range.end)
@@ -318,10 +335,10 @@ def update():
 
     if new_mandel_hash != old_mandel_hash:
         if gpu:
-            create_fractal_gpu[griddim, blockdim](*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, gpu_image, max_iterations, converge_threshold)
+            create_fractal_gpu[griddim, blockdim](*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, gpu_image, max_iterations, bias_term)
             gpu_image.copy_to_host(image)
         else:
-            create_fractal(*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, image, max_iterations, converge_threshold)
+            create_fractal(*mandel_x_range, *mandel_y_range, z_exponent, c_exponent, image, max_iterations, bias_term)
         source.data.update(image=[image], x=[mandel_x_range[0]], y=[mandel_y_range[0]],
             dw=[mandel_x_range[1] - mandel_x_range[0]], dh=[mandel_y_range[1] - mandel_y_range[0]])
         mandelplot.tags[-1] = new_mandel_hash
@@ -330,10 +347,10 @@ def update():
         if not args.skip_julia:
             julia_plot.title.text = f'Julia Set; c = {c_julia}'
             if gpu:
-                create_fractal_julia_gpu[griddim, blockdim](c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, gpu_image_julia, max_iterations, converge_threshold)
+                create_fractal_julia_gpu[griddim, blockdim](c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, gpu_image_julia, max_iterations, bias_term)
                 gpu_image_julia.copy_to_host(image_julia)
             else:
-                create_fractal_julia(c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, image_julia, max_iterations, converge_threshold)
+                create_fractal_julia(c_julia, *julia_x_range, *julia_y_range, z_exponent, c_exponent, image_julia, max_iterations, bias_term)
             source_julia.data.update(image=[image_julia], x=[julia_x_range[0]], y=[julia_y_range[0]],
                 dw=[julia_x_range[1] - julia_x_range[0]], dh=[julia_y_range[1] - julia_y_range[0]])
             julia_plot.tags[-1] = new_julia_hash
