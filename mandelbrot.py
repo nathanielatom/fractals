@@ -327,8 +327,8 @@ def update():
     julia_y_range = (julia_plot.y_range.start, julia_plot.y_range.end)
     c_julia = complex(hs.data['x'][0], hs.data['y'][0])
 
-    new_mandel_hash = hash((mandel_x_range, mandel_y_range, z_exponent, c_exponent, max_iterations))
-    new_julia_hash = hash((julia_x_range, julia_y_range, z_exponent, c_exponent, max_iterations, c_julia))
+    new_mandel_hash = hash((mandel_x_range, mandel_y_range, z_exponent, c_exponent, max_iterations, bias_term))
+    new_julia_hash = hash((julia_x_range, julia_y_range, z_exponent, c_exponent, max_iterations, bias_term, c_julia))
 
     mandelplot.tags[0] += 1
     julia_plot.tags[0] += 1
