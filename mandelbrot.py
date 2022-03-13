@@ -109,7 +109,7 @@ def powcomp(a, exponent):
 ei = np.e ** 1j
 
 @jitter
-def mandel(x, y, slider_a, slider_b, slider_c, slider_d, fractal='collatz'):
+def mandel(x, y, slider_a, slider_b, slider_c, slider_d):
     """
     Given the real and imaginary parts of a complex number,
     determine if it is a candidate for membership in the Mandelbrot
@@ -117,6 +117,7 @@ def mandel(x, y, slider_a, slider_b, slider_c, slider_d, fractal='collatz'):
 
     """
     # z = z * sin(1 / z) + pow(c, c_exponent) # forgot what this one was, looks fun
+    fractal='collatz'
     if fractal == 'mandel':
         max_iters = slider_c
         converge_thresh = slider_d
@@ -142,11 +143,12 @@ def mandel(x, y, slider_a, slider_b, slider_c, slider_d, fractal='collatz'):
 
         z = complex(x, y)
         # adjustable collatz
-        def fractal(z):
-            return ((lin_coeff * z + bias_term) - powcomp(np.e, 1j * math.pi * z) * (exp_coeff * z + bias_term)) / 4
+        # def fractal(z):
+        #     return ((lin_coeff * z + bias_term) - powcomp(np.e, 1j * math.pi * z) * (exp_coeff * z + bias_term)) / 4
 
     for i in range(max_iters):
-        z = fractal(z)
+        # z = fractal(z)
+        z = ((lin_coeff * z + bias_term) - powcomp(np.e, 1j * math.pi * z) * (exp_coeff * z + bias_term)) / 4
         if abs2(z) >= converge_thresh:
             return i
     return max_iters
