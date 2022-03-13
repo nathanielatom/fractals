@@ -264,8 +264,8 @@ c_exponent = 7
 c_julia = 0 + 0j
 max_iterations = 50
 
-old_mandel_hash = hash((mandel_x_range, mandel_y_range, z_exponent, c_exponent, max_iterations))
-old_julia_hash = hash((julia_x_range, julia_y_range, z_exponent, c_exponent, max_iterations, c_julia))
+old_mandel_hash = hash((mandel_x_range, mandel_y_range, z_exponent, c_exponent, max_iterations, bias_term))
+old_julia_hash = hash((julia_x_range, julia_y_range, z_exponent, c_exponent, max_iterations, bias_term, c_julia))
 
 if gpu:
     gpu_image = cuda.to_device(image)
