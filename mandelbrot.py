@@ -89,6 +89,20 @@ def abs2(z):
     return z.real * z.real + z.imag * z.imag
 
 @jitter
+def floorr(z, p):
+    return int(round(z)) // p
+
+@jitter
+def floorz(z, p):
+    return floorr(z.real, p) + 1j * floorr(z.imag, p)
+
+@jitter
+def padic_abs2(z, p):
+    # n = z // p
+    n = floorz(z, p)
+    return abs2(powcomp(p, -n))
+
+@jitter
 def pow(z, exponent):
     r = abs2(z) ** (0.5 * exponent)
     theta = math.atan2(z.imag, z.real) * exponent
@@ -149,7 +163,7 @@ def mandel(x, y, slider_a, slider_b, slider_c, slider_d):
     for i in range(max_iters):
         # z = fractal(z)
         z = ((lin_coeff * z + bias_term) - powcomp(np.e, 1j * math.pi * z) * (exp_coeff * z + bias_term)) / 4
-        if abs2(z) >= converge_thresh:
+        if padic_abs2(z, 7) >= converge_thresh:
             return i
     return max_iters
 
