@@ -62,9 +62,9 @@ from numba import cuda
 import math
 
 from bokeh.plotting import ColumnDataSource, figure, curdoc
-from bokeh.models import Slider, CrosshairTool, CustomJS
+from bokeh.models import Div, Slider, CrosshairTool, CustomJS
 from bokeh.events import MouseMove, Tap
-from bokeh.layouts import column, row, layout, gridplot
+from bokeh.layouts import column, row, gridplot
 from bokeh.palettes import viridis
 
 
@@ -163,7 +163,7 @@ def mandel(x, y, slider_a, slider_b, slider_c, slider_d):
     for i in range(max_iters):
         # z = fractal(z)
         z = ((lin_coeff * z + bias_term) - powcomp(np.e, 1j * math.pi * z) * (exp_coeff * z + bias_term)) / 4
-        if padic_abs2(z, 7) >= converge_thresh:
+        if padic_abs2(z, 3) >= converge_thresh:
             return i
     return max_iters
 
@@ -253,20 +253,6 @@ def create_fractal_julia_gpu(c, min_x, max_x, min_y, max_y, z_exponent, c_expone
 
 
 # if __name__ == '__main__':
-# Static parameters
-title = 'A Collatz Set'
-args.skip_julia = True
-if not args.skip_julia:
-    h, w = 1024, 1280
-else:
-    h, w = 800, 1000
-image = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
-image_julia = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
-blockdim = (32, 8)
-griddim = (32, 16)
-max_framerate = 10 # Hz
-
-bias_term = 2
 
 # Initial parameters
 mandel_x_range = (-2.125, 1)
@@ -278,8 +264,27 @@ c_exponent = 7
 c_julia = 0 + 0j
 max_iterations = 50
 
-old_mandel_hash = hash((mandel_x_range, mandel_y_range, z_exponent, c_exponent, max_iterations, bias_term))
-old_julia_hash = hash((julia_x_range, julia_y_range, z_exponent, c_exponent, max_iterations, bias_term, c_julia))
+mandel_x_span = mandel_x_range[1] - mandel_x_range[0]
+mandel_y_span = mandel_y_range[1] - mandel_y_range[0]
+
+# Static parameters
+title = 'A Collatz Set'
+args.skip_julia = True
+if not args.skip_julia:
+    h, w = 1024, 1280
+else:
+    h = 750
+w = int(round((mandel_x_span / mandel_y_span) * h))
+image = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
+image_julia = np.zeros((h, w), dtype=np.uint16) # 8 bit for overflow colours
+blockdim = (32, 8)
+griddim = (32, 16)
+max_framerate = 10 # Hz
+
+bias_term = 2
+
+old_mandel_hash = float(hash((mandel_x_range, mandel_y_range, z_exponent, c_exponent, max_iterations, bias_term)))
+old_julia_hash = float(hash((julia_x_range, julia_y_range, z_exponent, c_exponent, max_iterations, bias_term, c_julia)))
 
 if gpu:
     gpu_image = cuda.to_device(image)
@@ -299,7 +304,7 @@ if not args.skip_julia:
 source = ColumnDataSource(data=dict(image=[image],
     x=[mandel_x_range[0]], y=[mandel_y_range[0]],
     dw=[mandel_x_range[1] - mandel_x_range[0]], dh=[mandel_y_range[1] - mandel_y_range[0]]))
-mandelplot = figure(title=title, width=w, height=h, x_range=mandel_x_range, y_range=mandel_y_range, active_scroll='wheel_zoom')
+mandelplot = figure(title=title, width=w, height=h, x_range=mandel_x_range, y_range=mandel_y_range, active_scroll='wheel_zoom', sizing_mode="fixed")
 mandelplot.image('image', x='x', y='y', dw='dw', dh='dh', palette=viridis(256), source=source)
 
 # Cursor for Julia Set
@@ -320,14 +325,14 @@ mandelplot.on_event(Tap, update_tap)
 source_julia = ColumnDataSource(data=dict(image=[image_julia],
     x=[julia_x_range[0]], y=[julia_y_range[0]],
     dw=[julia_x_range[1] - julia_x_range[0]], dh=[julia_y_range[1] - julia_y_range[0]]))
-julia_plot = figure(title=f'Julia Set; c = {c_julia}', width=w, height=h, x_range=julia_x_range, y_range=julia_y_range, active_scroll='wheel_zoom')
+julia_plot = figure(title=f'Julia Set; c = {c_julia}', width=w, height=h, x_range=julia_x_range, y_range=julia_y_range, active_scroll='wheel_zoom', sizing_mode="scale_width")
 julia_plot.image('image', x='x', y='y', dw='dw', dh='dh', palette=viridis(256), source=source_julia)
 
 # TODO: rename sliders and cleanup parameter variables
-slider_exp_z = Slider(title="Exponential Coefficient", start=-100, end=100, value=z_exponent, step=0.1)
-slider_exp_c = Slider(title="Linear Coefficient", start=-50, end=50, value=c_exponent, step=0.005)
-slider_max_i = Slider(title="Max Iterations", start=1, end=2 ** 10, value=max_iterations, step=1)
-slider_conv_thresh = Slider(title="Bias Term", start=-100, end=100, value=bias_term, step=0.1)
+slider_exp_z = Slider(title="Exponential Coefficient", start=-100, end=100, value=z_exponent, step=0.1, sizing_mode="stretch_both")
+slider_exp_c = Slider(title="Linear Coefficient", start=-50, end=50, value=c_exponent, step=0.005, sizing_mode="stretch_both")
+slider_max_i = Slider(title="Max Iterations", start=1, end=2 ** 10, value=max_iterations, step=1, sizing_mode="stretch_both")
+slider_conv_thresh = Slider(title="Bias Term", start=-100, end=100, value=bias_term, step=0.1, sizing_mode="stretch_both")
 
 mandelplot.tags = [0, old_mandel_hash]
 julia_plot.tags = [0, old_julia_hash]
@@ -341,8 +346,8 @@ def update():
     julia_y_range = (julia_plot.y_range.start, julia_plot.y_range.end)
     c_julia = complex(hs.data['x'][0], hs.data['y'][0])
 
-    new_mandel_hash = hash((mandel_x_range, mandel_y_range, z_exponent, c_exponent, max_iterations, bias_term))
-    new_julia_hash = hash((julia_x_range, julia_y_range, z_exponent, c_exponent, max_iterations, bias_term, c_julia))
+    new_mandel_hash = float(hash((mandel_x_range, mandel_y_range, z_exponent, c_exponent, max_iterations, bias_term)))
+    new_julia_hash = float(hash((julia_x_range, julia_y_range, z_exponent, c_exponent, max_iterations, bias_term, c_julia)))
 
     mandelplot.tags[0] += 1
     julia_plot.tags[0] += 1
@@ -372,8 +377,10 @@ def update():
             julia_plot.tags[-1] = new_julia_hash
             print(f'julia event count: {julia_plot.tags[0]}')
 
-sliders = [column(slider_exp_z, slider_exp_c, slider_max_i, slider_conv_thresh)]
-grid = gridplot([[mandelplot] + ([julia_plot] if not args.skip_julia else sliders), sliders if not args.skip_julia else []], sizing_mode='scale_width')
+# heading = Div(text="Welcome to Fractaland!", height=100, sizing_mode="stretch_width")
+sliders = column(slider_exp_z, slider_exp_c, slider_max_i, slider_conv_thresh, sizing_mode="fixed", height=250, width=250)
+# grid = gridplot([[mandelplot] + ([julia_plot] if not args.skip_julia else sliders), sliders if not args.skip_julia else []], sizing_mode='scale_width')
+grid = column(row(mandelplot, sliders), sizing_mode="stretch_both")
 
 curdoc().add_periodic_callback(update, max_framerate ** -1 * 1000)
 curdoc().add_root(grid)
