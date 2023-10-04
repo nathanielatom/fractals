@@ -18,6 +18,10 @@ or
 bokeh serve --show mandelbrot.py --args --skip_julia
 ```
 
+Versions:
+numba: 0.58.0
+bokeh: 2.4.3
+
 # TODO: cleanup and document
 # TODO: add slider throttle to boost performance https://github.com/bokeh/bokeh/issues/4540
 # TODO: review mandel converge_threshold = 2; https://math.stackexchange.com/questions/890190/mandelbrot-sets-and-radius-of-convergence
